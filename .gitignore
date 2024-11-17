@@ -1,0 +1,48 @@
+# ROS 2 build directories
+build/
+install/
+log/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS files
+.DS_Store
+
+# Visual Studio Code settings
+.vscode/
+*.code-workspace
+
+# PyCharm/IntelliJ IDEA settings
+.idea/
+
+# Eclipse settings
+.project
+.cproject
+.settings/
+
+# Generated documentation
+doc/
+
+# Environment files
+.env
+.env.*
+
+# Temporary files created by editors
+*.swp
+*~
+
+# Backup files
+*.bak
+
+# ROS 2 specific logs
+*.db
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+
+# Colcon logs
+colcon_cache/
