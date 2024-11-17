@@ -1,4 +1,4 @@
-from hardware_interface import StepperMotorInterface
+from .hardware_interface import StepperMotorInterface
 
 
 class MockStepperMotor(StepperMotorInterface):
