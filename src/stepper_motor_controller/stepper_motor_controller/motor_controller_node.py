@@ -4,14 +4,14 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
-from hardware_interface import StepperMotorInterface
+from .hardware_interface import StepperMotorInterface
 
 import platform
 
 if platform.system() == 'Darwin':
-    from mock_stepper_motor import MockStepperMotor as StepperMotorImplementation
+    from .mock_stepper_motor import MockStepperMotor as StepperMotorImplementation
 else:
-    from gpio_stepper_motor import GPIOStepperMotor as StepperMotorImplementation
+    from .gpio_stepper_motor import GPIOStepperMotor as StepperMotorImplementation
 
 
 class MotorControllerNode(Node):
