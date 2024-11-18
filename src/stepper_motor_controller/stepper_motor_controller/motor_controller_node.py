@@ -23,16 +23,16 @@ class MotorControllerNode(Node):
         motor_configs = {
             1: {
                 'step_pin': 17,
-                'dir_pin': 27,
+                'dir_pin': 4,
                 'enable_pin': 22,
                 'initial_speed': 0,
             },
-            2: {
-                'step_pin': 23,
-                'dir_pin': 24,
-                'enable_pin': 25,
-                'initial_speed': 0,
-            },
+            # 2: {
+            #     'step_pin': 23,
+            #     'dir_pin': 24,
+            #     'enable_pin': 25,
+            #     'initial_speed': 0,
+            # },
         }
 
         # initialize the hardware interface with the node's logger
