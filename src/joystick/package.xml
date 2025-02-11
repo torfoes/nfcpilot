@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>joystick</name>
+  <version>0.0.0</version>
+  <description>Joystick control node for turtlesim on macOS</description>
+
+  <maintainer email="your.email@example.com">Your Name</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+
+  <exec_depend>pygame</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
