@@ -35,14 +35,15 @@ class GPIOStepperMotor(StepperMotorInterface):
         """
         Initialize motors based on the provided configurations.
         Each motor config should have 'step_pin', 'dir_pin' and optionally 'enable_pin'.
+        If 'enable_pin' is set to a negative value (e.g. -1), it is considered unused.
         """
         for motor_id, config in motor_configs.items():
             step_pin = config['step_pin']
             dir_pin = config['dir_pin']
             enable_pin = config.get('enable_pin', None)
 
+            # Request the STEP line.
             try:
-                # Request the STEP line.
                 step_line = self.chip.get_line(step_pin)
                 step_line.request(
                     consumer="GPIOStepperMotor-step",
@@ -53,8 +54,8 @@ class GPIOStepperMotor(StepperMotorInterface):
                 self.logger.error(f"Error requesting step_line on pin {step_pin} for motor {motor_id}: {e}")
                 continue
 
+            # Request the DIR line.
             try:
-                # Request the DIR line.
                 dir_line = self.chip.get_line(dir_pin)
                 dir_line.request(
                     consumer="GPIOStepperMotor-dir",
@@ -69,8 +70,8 @@ class GPIOStepperMotor(StepperMotorInterface):
                     pass
                 continue
 
-            # Request the ENABLE line, if provided.
-            if enable_pin is not None:
+            # Request the ENABLE line, if provided and valid (>= 0).
+            if enable_pin is not None and enable_pin >= 0:
                 try:
                     enable_line = self.chip.get_line(enable_pin)
                     enable_line.request(
@@ -80,7 +81,7 @@ class GPIOStepperMotor(StepperMotorInterface):
                     )
                 except OSError as e:
                     self.logger.error(f"Error requesting enable_line on pin {enable_pin} for motor {motor_id}: {e}")
-                    enable_line = None  # or decide if you want to abort motor initialization
+                    enable_line = None  # Or decide if you want to abort motor initialization
             else:
                 enable_line = None
 
