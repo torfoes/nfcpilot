@@ -1,4 +1,4 @@
-import RPi.GPIO as GPIO
+import gpiod
 import threading
 import time
 from .hardware_interface import StepperMotorInterface
@@ -8,35 +8,50 @@ class GPIOStepperMotor(StepperMotorInterface):
     def __init__(self, logger):
         self.motors = {}
         self.logger = logger
-        self.logger.info("GPIOStepperMotor initialized.")
+        self.logger.info("GPIOStepperMotor (libgpiod) initialized.")
 
-        # Initialize GPIO settings
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
+        # Open the GPIO chip (typically "gpiochip0" on the Pi)
+        self.chip = gpiod.Chip("gpiochip0")
 
     def initialize_motors(self, motor_configs):
         """
         Initialize motors based on the provided configurations.
-
-        :param motor_configs: A dictionary with motor_id as key and configuration as value.
+        Each motor config should have 'step_pin', 'dir_pin' and optionally 'enable_pin'.
         """
         for motor_id, config in motor_configs.items():
             step_pin = config['step_pin']
             dir_pin = config['dir_pin']
             enable_pin = config.get('enable_pin', None)
 
-            # Set up GPIO pins
-            GPIO.setup(step_pin, GPIO.OUT)
-            GPIO.setup(dir_pin, GPIO.OUT)
-            if enable_pin is not None:
-                GPIO.setup(enable_pin, GPIO.OUT)
-                GPIO.output(enable_pin, GPIO.LOW)
+            # Request the output lines for each pin using libgpiod
+            step_line = self.chip.get_line(step_pin)
+            step_line.request(
+                consumer="GPIOStepperMotor-step",
+                type=gpiod.LINE_REQ_DIR_OUT,
+                default_vals=[0]
+            )
 
-            # Initialize motor state
+            dir_line = self.chip.get_line(dir_pin)
+            dir_line.request(
+                consumer="GPIOStepperMotor-dir",
+                type=gpiod.LINE_REQ_DIR_OUT,
+                default_vals=[0]
+            )
+
+            if enable_pin is not None:
+                enable_line = self.chip.get_line(enable_pin)
+                enable_line.request(
+                    consumer="GPIOStepperMotor-enable",
+                    type=gpiod.LINE_REQ_DIR_OUT,
+                    default_vals=[0]
+                )
+            else:
+                enable_line = None
+
             motor = {
-                'step_pin': step_pin,
-                'dir_pin': dir_pin,
-                'enable_pin': enable_pin,
+                'step_line': step_line,
+                'dir_line': dir_line,
+                'enable_line': enable_line,
                 'speed': config.get('initial_speed', 0),
                 'running': False,
                 'thread': None,
@@ -51,7 +66,7 @@ class GPIOStepperMotor(StepperMotorInterface):
             motor = self.motors[motor_id]
             with motor['lock']:
                 if motor['running']:
-                    self.logger.warn(f"Motor {motor_id} is already running.")
+                    self.logger.warning(f"Motor {motor_id} is already running.")
                     return
                 motor['speed'] = speed
                 motor['running'] = True
@@ -65,28 +80,29 @@ class GPIOStepperMotor(StepperMotorInterface):
 
     def _run_motor(self, motor_id: int):
         motor = self.motors[motor_id]
-        step_pin = motor['step_pin']
-        dir_pin = motor['dir_pin']
+        step_line = motor['step_line']
+        dir_line = motor['dir_line']
         speed = motor['speed']
         stop_event = motor['stop_event']
 
-        # Set the direction
-        GPIO.output(dir_pin, GPIO.HIGH if speed >= 0 else GPIO.LOW)
+        # Set the direction based on the sign of speed.
+        # A value of 1 corresponds to a HIGH output.
+        dir_line.set_value(1 if speed >= 0 else 0)
         speed = abs(speed)
 
-        if speed == 0:
-            delay = 0.1  # Default delay for zero speed to prevent division by zero
-        else:
-            delay = 1.0 / (speed * 200 * 2)  # Adjust delay based on speed and steps per revolution
+        # Calculate delay based on speed (using 200 steps per revolution as an example).
+        delay = 0.1 if speed == 0 else 1.0 / (speed * 200 * 2)
 
         try:
             while not stop_event.is_set():
-                GPIO.output(step_pin, GPIO.HIGH)
+                # Pulse the STEP line HIGH then LOW.
+                step_line.set_value(1)
                 time.sleep(delay)
-                GPIO.output(step_pin, GPIO.LOW)
+                step_line.set_value(0)
                 time.sleep(delay)
         except Exception as e:
             self.logger.error(f"Error running motor {motor_id}: {e}")
+        finally:
             motor['running'] = False
 
     def stop_motor(self, motor_id: int):
@@ -94,7 +110,7 @@ class GPIOStepperMotor(StepperMotorInterface):
             motor = self.motors[motor_id]
             with motor['lock']:
                 if not motor['running']:
-                    self.logger.warn(f"Motor {motor_id} is not running.")
+                    self.logger.warning(f"Motor {motor_id} is not running.")
                     return
                 motor['running'] = False
                 motor['stop_event'].set()
@@ -109,26 +125,22 @@ class GPIOStepperMotor(StepperMotorInterface):
         if motor_id in self.motors:
             motor = self.motors[motor_id]
             with motor['lock']:
+                was_running = motor['running']
+                if was_running:
+                    # Stop the motor if it's currently running so that the new speed takes effect.
+                    self.stop_motor(motor_id)
                 motor['speed'] = speed
-                GPIO.output(motor['dir_pin'], GPIO.HIGH if speed >= 0 else GPIO.LOW)
-                speed = abs(speed)
-                if speed == 0:
-                    delay = 0.1
-                else:
-                    delay = 1.0 / (speed * 200 * 2)
-                motor['delay'] = delay
-                motor['stop_event'].set()
-                motor['running'] = False
-
-            # Restart the motor with new speed if it was running
-            if motor['running']:
+                motor['dir_line'].set_value(1 if speed >= 0 else 0)
+            # If the motor was running, restart it with the updated speed.
+            if was_running:
                 self.start_motor(motor_id, speed)
             self.logger.info(f"Set motor {motor_id} speed to {speed}")
         else:
             self.logger.error(f"Error: Motor {motor_id} not initialized.")
 
     def cleanup(self):
+        # Stop all motors and release the GPIO chip.
         for motor_id in list(self.motors.keys()):
             self.stop_motor(motor_id)
-        GPIO.cleanup()
+        self.chip.close()
         self.logger.info("GPIO cleanup completed.")
