@@ -25,7 +25,11 @@ class GPIOStepperMotor(StepperMotorInterface):
                 self.logger.warning(f"Unable to determine Pi model: {e}")
 
         self.logger.info(f"Using GPIO chip: {chip_device}")
-        self.chip = gpiod.Chip(chip_device)
+        try:
+            self.chip = gpiod.Chip(chip_device)
+        except Exception as e:
+            self.logger.error(f"Failed to open GPIO chip {chip_device}: {e}")
+            raise
 
     def initialize_motors(self, motor_configs):
         """
@@ -37,28 +41,46 @@ class GPIOStepperMotor(StepperMotorInterface):
             dir_pin = config['dir_pin']
             enable_pin = config.get('enable_pin', None)
 
-            # Request the output lines for each pin using libgpiod
-            step_line = self.chip.get_line(step_pin)
-            step_line.request(
-                consumer="GPIOStepperMotor-step",
-                type=gpiod.LINE_REQ_DIR_OUT,
-                default_vals=[0]
-            )
-
-            dir_line = self.chip.get_line(dir_pin)
-            dir_line.request(
-                consumer="GPIOStepperMotor-dir",
-                type=gpiod.LINE_REQ_DIR_OUT,
-                default_vals=[0]
-            )
-
-            if enable_pin is not None:
-                enable_line = self.chip.get_line(enable_pin)
-                enable_line.request(
-                    consumer="GPIOStepperMotor-enable",
+            try:
+                # Request the STEP line.
+                step_line = self.chip.get_line(step_pin)
+                step_line.request(
+                    consumer="GPIOStepperMotor-step",
                     type=gpiod.LINE_REQ_DIR_OUT,
                     default_vals=[0]
                 )
+            except OSError as e:
+                self.logger.error(f"Error requesting step_line on pin {step_pin} for motor {motor_id}: {e}")
+                continue
+
+            try:
+                # Request the DIR line.
+                dir_line = self.chip.get_line(dir_pin)
+                dir_line.request(
+                    consumer="GPIOStepperMotor-dir",
+                    type=gpiod.LINE_REQ_DIR_OUT,
+                    default_vals=[0]
+                )
+            except OSError as e:
+                self.logger.error(f"Error requesting dir_line on pin {dir_pin} for motor {motor_id}: {e}")
+                try:
+                    step_line.release()
+                except Exception:
+                    pass
+                continue
+
+            # Request the ENABLE line, if provided.
+            if enable_pin is not None:
+                try:
+                    enable_line = self.chip.get_line(enable_pin)
+                    enable_line.request(
+                        consumer="GPIOStepperMotor-enable",
+                        type=gpiod.LINE_REQ_DIR_OUT,
+                        default_vals=[0]
+                    )
+                except OSError as e:
+                    self.logger.error(f"Error requesting enable_line on pin {enable_pin} for motor {motor_id}: {e}")
+                    enable_line = None  # or decide if you want to abort motor initialization
             else:
                 enable_line = None
 
@@ -100,7 +122,6 @@ class GPIOStepperMotor(StepperMotorInterface):
         stop_event = motor['stop_event']
 
         # Set the direction based on the sign of speed.
-        # A value of 1 corresponds to a HIGH output.
         dir_line.set_value(1 if speed >= 0 else 0)
         speed = abs(speed)
 
@@ -141,11 +162,11 @@ class GPIOStepperMotor(StepperMotorInterface):
             with motor['lock']:
                 was_running = motor['running']
                 if was_running:
-                    # Stop the motor if it's currently running so that the new speed takes effect.
+                    # Stop the motor to update the speed.
                     self.stop_motor(motor_id)
                 motor['speed'] = speed
                 motor['dir_line'].set_value(1 if speed >= 0 else 0)
-            # If the motor was running, restart it with the updated speed.
+            # Restart the motor if it was running.
             if was_running:
                 self.start_motor(motor_id, speed)
             self.logger.info(f"Set motor {motor_id} speed to {speed}")
@@ -153,8 +174,24 @@ class GPIOStepperMotor(StepperMotorInterface):
             self.logger.error(f"Error: Motor {motor_id} not initialized.")
 
     def cleanup(self):
-        # Stop all motors and release the GPIO chip.
-        for motor_id in list(self.motors.keys()):
+        # Stop all motors and release the GPIO lines and chip.
+        for motor_id, motor in self.motors.items():
             self.stop_motor(motor_id)
-        self.chip.close()
+            try:
+                motor['step_line'].release()
+            except Exception as e:
+                self.logger.warning(f"Error releasing step_line for motor {motor_id}: {e}")
+            try:
+                motor['dir_line'].release()
+            except Exception as e:
+                self.logger.warning(f"Error releasing dir_line for motor {motor_id}: {e}")
+            if motor['enable_line'] is not None:
+                try:
+                    motor['enable_line'].release()
+                except Exception as e:
+                    self.logger.warning(f"Error releasing enable_line for motor {motor_id}: {e}")
+        try:
+            self.chip.close()
+        except Exception as e:
+            self.logger.warning(f"Error closing GPIO chip: {e}")
         self.logger.info("GPIO cleanup completed.")
