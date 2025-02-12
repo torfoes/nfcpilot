@@ -11,7 +11,7 @@ class GPIOStepperMotor(StepperMotorInterface):
         self.logger.info("GPIOStepperMotor (libgpiod) initialized.")
 
         # Open the GPIO chip (typically "gpiochip0" on the Pi)
-        self.chip = gpiod.Chip("gpiochip0")
+        self.chip = gpiod.Chip("gpiochip4")
 
     def initialize_motors(self, motor_configs):
         """
