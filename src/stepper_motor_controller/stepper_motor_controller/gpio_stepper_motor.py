@@ -10,8 +10,21 @@ class GPIOStepperMotor(StepperMotorInterface):
         self.logger = logger
         self.logger.info("GPIOStepperMotor (libgpiod) initialized.")
 
-        # Open the GPIO chip (typically "gpiochip0" on the Pi)
-        self.chip = gpiod.Chip("gpiochip4")
+        # Determine which GPIO chip to use:
+        chip_device = "gpiochip0"  # default for older Pis
+        if os.path.exists("/dev/gpiochip-rpi"):
+            chip_device = "gpiochip-rpi"
+        else:
+            try:
+                with open("/proc/device-tree/model", "r") as model_file:
+                    model = model_file.read()
+                if "Raspberry Pi 5" in model:
+                    chip_device = "gpiochip4"
+            except Exception as e:
+                self.logger.warning(f"Unable to determine Pi model: {e}")
+
+        self.logger.info(f"Using GPIO chip: {chip_device}")
+        self.chip = gpiod.Chip(chip_device)
 
     def initialize_motors(self, motor_configs):
         """
