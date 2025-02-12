@@ -1,6 +1,7 @@
 import gpiod
 import threading
 import time
+import os
 from .hardware_interface import StepperMotorInterface
 
 
