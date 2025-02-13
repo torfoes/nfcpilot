@@ -19,7 +19,7 @@ class MotorControllerNode(Node):
         super().__init__('motor_controller_node')
         self.get_logger().info('Stepper Motor Controller Node has been started.')
 
-        # motor configurations
+        # Motor configurations
         motor_configs = {
             1: {
                 'step_pin': 18,
@@ -35,7 +35,7 @@ class MotorControllerNode(Node):
             },
         }
 
-        # initialize the hardware interface with the node's logger
+        # Initialize the hardware interface with the node's logger
         self.motor_controller = StepperMotorImplementation(self.get_logger())
         self.motor_controller.initialize_motors(motor_configs)
 
@@ -60,14 +60,15 @@ class MotorControllerNode(Node):
         try:
             if cmd_type == 'START':
                 motor_id = int(parts[1])
-                speed = int(parts[2])
+                # Parse speed as float (so 0.5 rps is allowed)
+                speed = float(parts[2])
                 self.motor_controller.start_motor(motor_id, speed)
             elif cmd_type == 'STOP':
                 motor_id = int(parts[1])
                 self.motor_controller.stop_motor(motor_id)
             elif cmd_type == 'SET_SPEED':
                 motor_id = int(parts[1])
-                speed = int(parts[2])
+                speed = float(parts[2])
                 self.motor_controller.set_speed(motor_id, speed)
             else:
                 self.get_logger().warn(f'Unknown command: {cmd_type}')
@@ -94,4 +95,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
