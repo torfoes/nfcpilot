@@ -3,9 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-
 from .hardware_interface import StepperMotorInterface
-
 import platform
 
 if platform.system() == 'Darwin':
@@ -60,9 +58,9 @@ class MotorControllerNode(Node):
         try:
             if cmd_type == 'START':
                 motor_id = int(parts[1])
-                # Parse speed as float (so 0.5 rps is allowed)
                 speed = float(parts[2])
-                self.motor_controller.start_motor(motor_id, speed)
+                # Use the unified interface to update speed
+                self.motor_controller.set_speed(motor_id, speed)
             elif cmd_type == 'STOP':
                 motor_id = int(parts[1])
                 self.motor_controller.stop_motor(motor_id)
