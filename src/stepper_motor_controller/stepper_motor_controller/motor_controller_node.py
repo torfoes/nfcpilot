@@ -22,8 +22,8 @@ class MotorControllerNode(Node):
         # Motor configurations
         motor_configs = {
             1: {
-                'step_pin': 18,
-                'dir_pin': 23,
+                'step_pin': 23,
+                'dir_pin': 18,
                 'enable_pin': -1,
                 'initial_speed': 0,
             },
