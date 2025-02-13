@@ -89,7 +89,7 @@ class GPIOStepperMotor(StepperMotorInterface):
                 'step_line': step_line,
                 'dir_line': dir_line,
                 'enable_line': enable_line,
-                'speed': config.get('initial_speed', 0),
+                'speed': config.get('initial_speed', 0.0),  # using float for speed
                 'running': False,
                 'thread': None,
                 'lock': threading.Lock(),
@@ -98,7 +98,7 @@ class GPIOStepperMotor(StepperMotorInterface):
             self.motors[motor_id] = motor
             self.logger.info(f"Motor {motor_id} initialized with config: {config}")
 
-    def start_motor(self, motor_id: int, speed: int):
+    def start_motor(self, motor_id: int, speed: float):
         if motor_id in self.motors:
             motor = self.motors[motor_id]
             with motor['lock']:
@@ -119,19 +119,20 @@ class GPIOStepperMotor(StepperMotorInterface):
         motor = self.motors[motor_id]
         step_line = motor['step_line']
         dir_line = motor['dir_line']
-        speed = motor['speed']
+        # Read the current speed once at thread start.
+        current_speed = motor['speed']
         stop_event = motor['stop_event']
 
         # Set the direction based on the sign of speed.
-        dir_line.set_value(1 if speed >= 0 else 0)
-        speed = abs(speed)
+        dir_line.set_value(1 if current_speed >= 0 else 0)
+        current_speed = abs(current_speed)
 
-        # Calculate delay based on speed (using 200 steps per revolution as an example).
-        delay = 0.1 if speed == 0 else 1.0 / (speed * 200 * 2)
+        # Calculate delay based on speed (assuming 200 steps per revolution).
+        delay = 0.1 if current_speed == 0 else 1.0 / (current_speed * 200 * 2)
 
         try:
             while not stop_event.is_set():
-                # Pulse the STEP line HIGH then LOW.
+                # Generate a pulse: HIGH for 'delay', LOW for 'delay'.
                 step_line.set_value(1)
                 time.sleep(delay)
                 step_line.set_value(0)
@@ -157,17 +158,19 @@ class GPIOStepperMotor(StepperMotorInterface):
         else:
             self.logger.error(f"Error: Motor {motor_id} not initialized.")
 
-    def set_speed(self, motor_id: int, speed: int):
+    def set_speed(self, motor_id: int, speed: float):
         if motor_id in self.motors:
             motor = self.motors[motor_id]
+            # Check running status without holding the lock for the entire stop.
             with motor['lock']:
                 was_running = motor['running']
-                if was_running:
-                    # Stop the motor to update the speed.
-                    self.stop_motor(motor_id)
+            if was_running:
+                self.stop_motor(motor_id)
+            # Update speed and direction.
+            with motor['lock']:
                 motor['speed'] = speed
                 motor['dir_line'].set_value(1 if speed >= 0 else 0)
-            # Restart the motor if it was running.
+            # If the motor was running before, restart it.
             if was_running:
                 self.start_motor(motor_id, speed)
             self.logger.info(f"Set motor {motor_id} speed to {speed}")
