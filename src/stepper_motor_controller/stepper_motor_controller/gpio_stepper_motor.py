@@ -195,3 +195,4 @@ class GPIOStepperMotor(StepperMotorInterface):
         except Exception as e:
             self.logger.warning(f"Error closing GPIO chip: {e}")
         self.logger.info("GPIO cleanup completed.")
+
