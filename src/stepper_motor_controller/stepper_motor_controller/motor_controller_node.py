@@ -33,7 +33,7 @@ class MotorControllerNode(Node):
             },
         }
 
-        # Initialize the hardware interface with the node's logger
+        # Initialize the hardware interface with the node's logger.
         self.motor_controller = StepperMotorImplementation(self.get_logger())
         self.motor_controller.initialize_motors(motor_configs)
 
@@ -46,32 +46,31 @@ class MotorControllerNode(Node):
 
     def command_callback(self, msg):
         command = msg.data.strip()
-        self.get_logger().info(f'Received command: {command}')
+        self.get_logger().info(f"Received command: {command}")
 
         parts = command.split(',')
         if not parts:
-            self.get_logger().error('Invalid command format.')
+            self.get_logger().error("Invalid command format.")
             return
 
         cmd_type = parts[0].upper()
 
         try:
-            if cmd_type == 'START':
+            if cmd_type == "STEP":
+                # Expected format: STEP,<motor_id>,<steps>,<speed>
                 motor_id = int(parts[1])
-                speed = float(parts[2])
-                # Use the unified interface to update speed
-                self.motor_controller.set_speed(motor_id, speed)
-            elif cmd_type == 'STOP':
-                motor_id = int(parts[1])
-                self.motor_controller.stop_motor(motor_id)
-            elif cmd_type == 'SET_SPEED':
+                steps = int(parts[2])
+                speed = float(parts[3])
+                self.motor_controller.step_motor(motor_id, steps, speed)
+            elif cmd_type == "SET_SPEED":
+                # Expected format: SET_SPEED,<motor_id>,<speed>
                 motor_id = int(parts[1])
                 speed = float(parts[2])
                 self.motor_controller.set_speed(motor_id, speed)
             else:
-                self.get_logger().warn(f'Unknown command: {cmd_type}')
+                self.get_logger().warn(f"Unknown command: {cmd_type}")
         except (IndexError, ValueError) as e:
-            self.get_logger().error(f'Error parsing command: {e}')
+            self.get_logger().error(f"Error parsing command: {e}")
 
     def destroy_node(self):
         self.motor_controller.cleanup()
@@ -84,7 +83,7 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info('Motor Controller Node stopped by user.')
+        node.get_logger().info("Motor Controller Node stopped by user.")
     finally:
         node.destroy_node()
         if rclpy.ok():
