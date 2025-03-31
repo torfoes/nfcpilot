@@ -12,7 +12,7 @@
   <!-- Runtime dependencies -->
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
-  <!-- Replaced RPi.GPIO with libgpiod for GPIO access -->
+  <!-- Using libgpiod for GPIO access -->
   <exec_depend>libgpiod</exec_depend>
 
   <!-- Test dependencies -->

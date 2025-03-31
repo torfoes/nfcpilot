@@ -12,10 +12,8 @@ authors = [
 license = { text = "MIT" }
 
 dependencies = [
-  "setuptools",
   "pyscard",
   "pygame",
-
   "gpiod; platform_system=='Linux' and (platform_machine=='armv7l' or platform_machine=='aarch64')"
 ]
 

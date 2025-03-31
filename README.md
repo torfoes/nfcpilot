@@ -16,12 +16,26 @@ This setup allows for efficient and automated programming of NFC tags in a conti
 
 # Getting Started
 
-You may need this system dependency pyscard
+### You may need this system dependency for pyscard
 ```commandline
 sudo apt install libpcsclite-dev
 ```
 
 ```commandline
+python3 -m venv venv
+touch venv/COLCON_IGNORE
+source venv/bin/activate
+
+export PYTHONPATH="$(pwd)/venv/lib/python3.12/site-packages:$PYTHONPATH"
 pip install -e .
+
+colcon build --symlink-install
+source install/setup.bash
+
+
 ```
 
+To run a launch a motor node
+```commandline
+ros2 run stepper_motor_controller motor_controller_node
+```

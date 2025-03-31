@@ -4,6 +4,7 @@ import time
 import os
 from .hardware_interface import StepperMotorInterface
 
+
 class GPIOStepperMotor(StepperMotorInterface):
     def __init__(self, logger):
         self.motors = {}
@@ -11,15 +12,17 @@ class GPIOStepperMotor(StepperMotorInterface):
         self.logger.info("GPIOStepperMotor (libgpiod) initialized.")
 
         # Determine which GPIO chip to use:
-        chip_device = "gpiochip0"  # default for older Pis
+        chip_device = "/dev/gpiochip0"  # default for older Pis
+
+        # If the RPi-specific chip exists, use its full path:
         if os.path.exists("/dev/gpiochip-rpi"):
-            chip_device = "gpiochip-rpi"
+            chip_device = "/dev/gpiochip-rpi"
         else:
             try:
                 with open("/proc/device-tree/model", "r") as model_file:
                     model = model_file.read()
                 if "Raspberry Pi 5" in model:
-                    chip_device = "gpiochip4"
+                    chip_device = "/dev/gpiochip4"
             except Exception as e:
                 self.logger.warning(f"Unable to determine Pi model: {e}")
 

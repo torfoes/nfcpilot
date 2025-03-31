@@ -1,11 +1,10 @@
 from setuptools import setup
-import sys
 import platform
 
 package_name = 'stepper_motor_controller'
 
-# For ARM/Linux systems (e.g. Pi5), require the libgpiod Python bindings.
-if platform.system() == 'Linux' and 'arm' in platform.machine():
+# For ARM/Linux systems (e.g. Pi5 or aarch64 systems), require the libgpiod Python bindings.
+if platform.system() == 'Linux' and ('arm' in platform.machine() or 'aarch64' in platform.machine()):
     install_requires = [
         'setuptools',
         'gpiod',
