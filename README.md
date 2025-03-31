@@ -13,3 +13,15 @@
 ---
 
 This setup allows for efficient and automated programming of NFC tags in a continuous reel-to-reel process.
+
+# Getting Started
+
+You may need this system dependency pyscard
+```commandline
+sudo apt install libpcsclite-dev
+```
+
+```commandline
+pip install -e .
+```
+

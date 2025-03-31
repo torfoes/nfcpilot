@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nfcpilot-meta"
+version = "0.1.0"
+description = "Meta package for nfcpilot ROS 2 nodes"
+authors = [
+  { name = "karlos", email = "karloszuru@gmail.com" }
+]
+license = { text = "MIT" }
+
+dependencies = [
+  "setuptools",
+  "pyscard",
+  "pygame",
+
+  "gpiod; platform_system=='Linux' and (platform_machine=='armv7l' or platform_machine=='aarch64')"
+]
+

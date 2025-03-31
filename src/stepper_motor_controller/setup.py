@@ -8,7 +8,7 @@ package_name = 'stepper_motor_controller'
 if platform.system() == 'Linux' and 'arm' in platform.machine():
     install_requires = [
         'setuptools',
-        'gpiod',  # This package provides the Python bindings for libgpiod.
+        'gpiod',
     ]
 else:
     install_requires = [
