@@ -26,8 +26,8 @@ class MotorControllerNode(Node):
                 'initial_speed': 0,
             },
             2: {
-                'step_pin': 24,
-                'dir_pin': 25,
+                'step_pin': 2,
+                'dir_pin': 3,
                 'enable_pin': -1,
                 'initial_speed': 0,
             },
