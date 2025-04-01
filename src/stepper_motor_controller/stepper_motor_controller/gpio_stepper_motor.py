@@ -2,7 +2,7 @@ import os
 import gpiod
 import threading
 import time
-from gpiod.line import Direction, Value  # Only import what is needed
+from gpiod.line import Direction, Value
 from .hardware_interface import StepperMotorInterface
 
 class GPIOStepperMotor(StepperMotorInterface):
