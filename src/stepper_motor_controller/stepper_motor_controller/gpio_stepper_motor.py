@@ -2,6 +2,7 @@ import os
 import gpiod
 import threading
 import time
+from gpiod.line import Direction, Value, LineSettings
 from .hardware_interface import StepperMotorInterface
 
 class GPIOStepperMotor(StepperMotorInterface):
@@ -12,6 +13,8 @@ class GPIOStepperMotor(StepperMotorInterface):
 
         # Determine which GPIO chip to use:
         chip_device = "/dev/gpiochip0"  # default for older Pis
+
+        # If the RPi-specific chip exists, use its full path:
         if os.path.exists("/dev/gpiochip-rpi"):
             chip_device = "/dev/gpiochip-rpi"
         else:
@@ -41,30 +44,30 @@ class GPIOStepperMotor(StepperMotorInterface):
             dir_pin = config['dir_pin']
             enable_pin = config.get('enable_pin', None)
 
-            # Request the STEP line using the new API.
+            # Request the STEP line.
             try:
-                step_req = gpiod.request_lines(
-                    self.chip.path,
+                step_line = self.chip.get_line(step_pin)
+                step_line.request(
                     consumer="GPIOStepperMotor-step",
-                    config={ step_pin: gpiod.LineSettings(direction=gpiod.line.Direction.OUTPUT,
-                                                           output_value=gpiod.line.Value.INACTIVE) }
+                    type=gpiod.LINE_REQ_DIR_OUT,
+                    default_vals=[Value.INACTIVE]
                 )
             except OSError as e:
-                self.logger.error(f"Error requesting step line on pin {step_pin} for motor {motor_id}: {e}")
+                self.logger.error(f"Error requesting step_line on pin {step_pin} for motor {motor_id}: {e}")
                 continue
 
             # Request the DIR line.
             try:
-                dir_req = gpiod.request_lines(
-                    self.chip.path,
+                dir_line = self.chip.get_line(dir_pin)
+                dir_line.request(
                     consumer="GPIOStepperMotor-dir",
-                    config={ dir_pin: gpiod.LineSettings(direction=gpiod.line.Direction.OUTPUT,
-                                                          output_value=gpiod.line.Value.INACTIVE) }
+                    type=gpiod.LINE_REQ_DIR_OUT,
+                    default_vals=[Value.INACTIVE]
                 )
             except OSError as e:
-                self.logger.error(f"Error requesting dir line on pin {dir_pin} for motor {motor_id}: {e}")
+                self.logger.error(f"Error requesting dir_line on pin {dir_pin} for motor {motor_id}: {e}")
                 try:
-                    step_req.release()
+                    step_line.release()
                 except Exception:
                     pass
                 continue
@@ -72,23 +75,23 @@ class GPIOStepperMotor(StepperMotorInterface):
             # Request the ENABLE line, if provided and valid.
             if enable_pin is not None and enable_pin >= 0:
                 try:
-                    enable_req = gpiod.request_lines(
-                        self.chip.path,
+                    enable_line = self.chip.get_line(enable_pin)
+                    enable_line.request(
                         consumer="GPIOStepperMotor-enable",
-                        config={ enable_pin: gpiod.LineSettings(direction=gpiod.line.Direction.OUTPUT,
-                                                                 output_value=gpiod.line.Value.INACTIVE) }
+                        type=gpiod.LINE_REQ_DIR_OUT,
+                        default_vals=[Value.INACTIVE]
                     )
                 except OSError as e:
-                    self.logger.error(f"Error requesting enable line on pin {enable_pin} for motor {motor_id}: {e}")
-                    enable_req = None
+                    self.logger.error(f"Error requesting enable_line on pin {enable_pin} for motor {motor_id}: {e}")
+                    enable_line = None
             else:
-                enable_req = None
+                enable_line = None
 
-            self.motors[motor_id] = {
-                'step_req': step_req,
-                'dir_req': dir_req,
-                'enable_req': enable_req,
-                'speed': config.get('initial_speed', 0.0),
+            motor = {
+                'step_line': step_line,
+                'dir_line': dir_line,
+                'enable_line': enable_line,
+                'speed': config.get('initial_speed', 0.0),  # speed is a float between -1 and 1
                 'running': False,
                 'thread': None,
                 'lock': threading.Lock(),
@@ -97,13 +100,14 @@ class GPIOStepperMotor(StepperMotorInterface):
                 'dir_pin': dir_pin,
                 'enable_pin': enable_pin,
             }
+            self.motors[motor_id] = motor
             self.logger.info(f"Motor {motor_id} initialized with config: {config}")
 
     def _run_motor(self, motor_id: int):
         """Internal thread function for continuous motion via set_speed()."""
         motor = self.motors[motor_id]
-        step_req = motor['step_req']
-        dir_req = motor['dir_req']
+        step_line = motor['step_line']
+        dir_line = motor['dir_line']
         stop_event = motor['stop_event']
         step_pin = motor['step_pin']
         dir_pin = motor['dir_pin']
@@ -113,12 +117,12 @@ class GPIOStepperMotor(StepperMotorInterface):
                 with motor['lock']:
                     current_speed = motor['speed']
                 # Set direction based on sign.
-                dir_req.set_value(dir_pin, 1 if current_speed >= 0 else 0)
+                dir_line.set_value(dir_pin, Value.ACTIVE if current_speed >= 0 else Value.INACTIVE)
                 current_speed = abs(current_speed)
                 delay = 0.1 if current_speed == 0 else 1.0 / (current_speed * 200 * 2)
-                step_req.set_value(step_pin, 1)
+                step_line.set_value(step_pin, Value.ACTIVE)
                 time.sleep(delay)
-                step_req.set_value(step_pin, 0)
+                step_line.set_value(step_pin, Value.INACTIVE)
                 time.sleep(delay)
         except Exception as e:
             self.logger.error(f"Error running motor {motor_id}: {e}")
@@ -128,23 +132,23 @@ class GPIOStepperMotor(StepperMotorInterface):
     def _step_motor_thread(self, motor_id: int, steps: int, speed: float):
         """Internal thread function to step the motor a fixed number of steps."""
         motor = self.motors[motor_id]
-        step_req = motor['step_req']
-        dir_req = motor['dir_req']
+        step_line = motor['step_line']
+        dir_line = motor['dir_line']
         step_pin = motor['step_pin']
         # Set direction based on the sign of steps.
         if steps < 0:
             steps = abs(steps)
-            dir_req.set_value(motor['dir_pin'], 0)
+            dir_line.set_value(motor['dir_pin'], Value.INACTIVE)
         else:
-            dir_req.set_value(motor['dir_pin'], 1)
+            dir_line.set_value(motor['dir_pin'], Value.ACTIVE)
         current_speed = abs(speed)
         delay = 0.1 if current_speed == 0 else 1.0 / (current_speed * 200 * 2)
         for _ in range(steps):
             if motor['stop_event'].is_set():
                 break
-            step_req.set_value(step_pin, 1)
+            step_line.set_value(step_pin, Value.ACTIVE)
             time.sleep(delay)
-            step_req.set_value(step_pin, 0)
+            step_line.set_value(step_pin, Value.INACTIVE)
             time.sleep(delay)
         motor['running'] = False
 
@@ -173,7 +177,7 @@ class GPIOStepperMotor(StepperMotorInterface):
                 motor['speed'] = 0
             else:
                 motor['speed'] = speed
-                motor['dir_req'].set_value(motor['dir_pin'], 1 if speed >= 0 else 0)
+                motor['dir_line'].set_value(motor['dir_pin'], Value.ACTIVE if speed >= 0 else Value.INACTIVE)
                 if not motor['running']:
                     motor['stop_event'].clear()
                     motor['running'] = True
@@ -210,20 +214,21 @@ class GPIOStepperMotor(StepperMotorInterface):
         Cleanup all motors by stopping any running motion and releasing GPIO resources.
         """
         for motor_id, motor in self.motors.items():
+            # Stop the motor by setting its speed to 0.
             self.set_speed(motor_id, 0)
             try:
-                motor['step_req'].release()
+                motor['step_line'].release()
             except Exception as e:
-                self.logger.warning(f"Error releasing step_req for motor {motor_id}: {e}")
+                self.logger.warning(f"Error releasing step_line for motor {motor_id}: {e}")
             try:
-                motor['dir_req'].release()
+                motor['dir_line'].release()
             except Exception as e:
-                self.logger.warning(f"Error releasing dir_req for motor {motor_id}: {e}")
-            if motor['enable_req'] is not None:
+                self.logger.warning(f"Error releasing dir_line for motor {motor_id}: {e}")
+            if motor['enable_line'] is not None:
                 try:
-                    motor['enable_req'].release()
+                    motor['enable_line'].release()
                 except Exception as e:
-                    self.logger.warning(f"Error releasing enable_req for motor {motor_id}: {e}")
+                    self.logger.warning(f"Error releasing enable_line for motor {motor_id}: {e}")
         try:
             self.chip.close()
         except Exception as e:
