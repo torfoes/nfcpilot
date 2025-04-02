@@ -1,0 +1,19 @@
+# config/motors.yaml
+motor_controller_node:
+  ros__parameters:
+    # This is correctly specified for RPi 5
+    gpio_chip_device: "/dev/gpiochip4"
+    motors:
+      motor1:
+        step_pin: 17 # Example pins, verify these are correct on gpiochip4 for your RPi5
+        dir_pin: 27
+        # enable_pin: -1 # Optional: Add if you have an enable pin, otherwise omit or set < 0
+        steps_per_revolution: 200
+        max_step_frequency_hz: 400
+      motor2:
+        step_pin: 2 # Example pins, verify these are correct on gpiochip4 for your RPi5
+        dir_pin: 3
+        # enable_pin: -1
+        steps_per_revolution: 200
+        max_step_frequency_hz: 400
+      # Add more motors as needed

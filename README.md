@@ -1,4 +1,4 @@
-# nfcpilot
+**# nfcpilot
 
 **nfcpilot** is an open-source reel-to-reel NFC tag programmer designed to automate the programming of NFC tags using stepper motors and an NFC reader.
 
