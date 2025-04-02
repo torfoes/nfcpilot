@@ -1,0 +1,19 @@
+motor_controller_node:
+  ros__parameters:
+    motor_ids: [1, 2] # List the IDs of motors you want to configure
+
+    motor_1:
+      step_pin: 17
+      dir_pin: 27
+      enable_pin: -1 # Optional, -1 if not used
+      max_speed_rps: 1.5 # Max speed in revolutions/sec
+      steps_per_revolution: 200
+      initial_speed: 0.0 # Initial speed fraction (-1 to 1)
+
+    motor_2:
+      step_pin: 2
+      dir_pin: 3
+      enable_pin: -1
+      max_speed_rps: 1.0
+      steps_per_revolution: 200
+      initial_speed: 0.0
